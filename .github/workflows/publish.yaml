@@ -1,0 +1,33 @@
+name: Publish APT Repo
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'pool/**'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Install tools
+      run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg
+
+    - name: Import signing key
+      run: |
+        echo "${{ secrets.APT_SIGNING_PRIVATE_KEY }}" | gpg --batch --import
+
+    - name: Rebuild Packages.gz and sign repo
+      run: |
+        mkdir -p dists/stable/main/binary-amd64
+        dpkg-scanpackages pool /dev/null | gzip -9c > dists/stable/main/binary-amd64/Packages.gz
+        bash sign-release.sh
+
+    - name: Commit updated metadata
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "📦 Repo update"
+        file_pattern: "dists/** Release*"
